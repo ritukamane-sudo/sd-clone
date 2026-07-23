@@ -4,21 +4,15 @@ import * as schema from "@/db/schema/index";
 
 const globalForDb = globalThis as unknown as { client: postgres.Sql | undefined; db: ReturnType<typeof drizzle> | undefined };
 
-if (!globalForDb.db) {
-  const url = new URL(process.env.DATABASE_URL!);
-  if (url.hostname.endsWith(".supabase.co")) {
-    try {
-      const { setServers } = await import("node:dns");
-      const { resolve6 } = await import("node:dns/promises");
-      setServers(["8.8.8.8", "8.8.4.4", "2001:4860:4860::8888"]);
-      const addresses = await resolve6(url.hostname, { ttl: false });
-      if (addresses.length > 0) {
-        url.hostname = `[${addresses[0]}]`;
-      }
-    } catch {}
+function getClient() {
+  if (!globalForDb.client) {
+    globalForDb.client = postgres(process.env.DATABASE_URL!, { prepare: false });
   }
-  globalForDb.client = postgres(url.toString(), { prepare: false });
-  globalForDb.db = drizzle(globalForDb.client, { schema });
+  return globalForDb.client;
+}
+
+if (!globalForDb.db) {
+  globalForDb.db = drizzle(getClient(), { schema });
 }
 
 export const db = globalForDb.db;
