@@ -4,9 +4,7 @@ import * as schema from "@/db/schema/index";
 
 const globalForDb = globalThis as unknown as { client: postgres.Sql | undefined; db: ReturnType<typeof drizzle> | undefined };
 
-async function initDb() {
-  if (globalForDb.db) return;
-
+if (!globalForDb.db) {
   const url = new URL(process.env.DATABASE_URL!);
   if (url.hostname.endsWith(".supabase.co")) {
     try {
@@ -17,24 +15,8 @@ async function initDb() {
       }
     } catch {}
   }
-
-  globalForDb.client = postgres(url.toString(), { prepare: false, max_lifetime: 60 * 30, idle_timeout: 20 });
+  globalForDb.client = postgres(url.toString(), { prepare: false });
   globalForDb.db = drizzle(globalForDb.client, { schema });
 }
 
-const initPromise = initDb();
-
-export async function getDb() {
-  await initPromise;
-  return globalForDb.db!;
-}
-
-export const db = new Proxy({} as ReturnType<typeof drizzle>, {
-  get(_, prop: string) {
-    return (...args: any[]) => {
-      const d = globalForDb.db;
-      if (!d) throw new Error("DB not initialized yet - use getDb() for async access");
-      return (d as any)[prop](...args);
-    };
-  },
-});
+export const db = globalForDb.db;
