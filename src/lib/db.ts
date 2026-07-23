@@ -1,38 +1,40 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "@/db/schema/index";
-import { resolve6Sync, setServers } from "node:dns";
 
 const globalForDb = globalThis as unknown as { client: postgres.Sql | undefined; db: ReturnType<typeof drizzle> | undefined };
 
-function resolveHostnameSync(hostname: string): string {
-  try {
-    setServers(["8.8.8.8", "8.8.4.4"]);
-    const addresses = resolve6Sync(hostname);
-    if (addresses.length > 0) {
-      return `[${addresses[0]}]`;
-    }
-  } catch { }
-  return hostname;
-}
+async function initDb() {
+  if (globalForDb.db) return;
 
-function getConnectionUrl(): string {
-  const url = process.env.DATABASE_URL!;
-  try {
-    const parsed = new URL(url);
-    if (parsed.hostname.endsWith(".supabase.co")) {
-      parsed.hostname = resolveHostnameSync(parsed.hostname);
-    }
-  } catch { }
-  return url;
-}
+  const url = new URL(process.env.DATABASE_URL!);
+  if (url.hostname.endsWith(".supabase.co")) {
+    try {
+      const { resolve6 } = await import("node:dns/promises");
+      const addresses = await resolve6(url.hostname);
+      if (addresses.length > 0) {
+        url.hostname = `[${addresses[0]}]`;
+      }
+    } catch {}
+  }
 
-if (!globalForDb.client) {
-  globalForDb.client = postgres(getConnectionUrl(), { prepare: false });
-}
-
-if (!globalForDb.db) {
+  globalForDb.client = postgres(url.toString(), { prepare: false, max_lifetime: 60 * 30, idle_timeout: 20 });
   globalForDb.db = drizzle(globalForDb.client, { schema });
 }
 
-export const db = globalForDb.db;
+const initPromise = initDb();
+
+export async function getDb() {
+  await initPromise;
+  return globalForDb.db!;
+}
+
+export const db = new Proxy({} as ReturnType<typeof drizzle>, {
+  get(_, prop: string) {
+    return (...args: any[]) => {
+      const d = globalForDb.db;
+      if (!d) throw new Error("DB not initialized yet - use getDb() for async access");
+      return (d as any)[prop](...args);
+    };
+  },
+});
