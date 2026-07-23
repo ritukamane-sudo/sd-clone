@@ -20,15 +20,17 @@ export default function LoginPage() {
 
     const fn = mode === "login"
       ? supabase.auth.signInWithPassword({ email, password })
-      : supabase.auth.signUp({ email, password, options: { emailRedirectTo: `${window.location.origin}/auth/callback` } });
+      : supabase.auth.signUp({ email, password });
 
     const { error: err } = await fn;
     if (err) {
       setError(err.message);
     } else if (mode === "signup") {
-      setError("Check your email for the confirmation link.");
+      setError("Account created! Try signing in.");
+      setMode("login");
     } else {
       window.location.href = "/contracts";
+    }
     }
     setLoading(false);
   };
