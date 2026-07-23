@@ -8,8 +8,10 @@ if (!globalForDb.db) {
   const url = new URL(process.env.DATABASE_URL!);
   if (url.hostname.endsWith(".supabase.co")) {
     try {
+      const { setServers } = await import("node:dns");
       const { resolve6 } = await import("node:dns/promises");
-      const addresses = await resolve6(url.hostname);
+      setServers(["8.8.8.8", "8.8.4.4", "2001:4860:4860::8888"]);
+      const addresses = await resolve6(url.hostname, { ttl: false });
       if (addresses.length > 0) {
         url.hostname = `[${addresses[0]}]`;
       }
