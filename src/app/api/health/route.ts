@@ -10,21 +10,11 @@ export async function GET() {
   };
 
   try {
-    const url = new URL(process.env.DATABASE_URL!);
-    envCheck.dbUrlPrefix = `${url.protocol}//${url.username}:***@${url.hostname}:${url.port}${url.pathname}${url.search}`;
-  } catch { }
-
-  try {
     const { db } = await import("@/lib/db");
     const { sql } = await import("drizzle-orm");
     const [result] = await db.execute(sql`SELECT 1 as ok`);
     return NextResponse.json({ status: "ok", db: true, env: envCheck, result });
   } catch (e: any) {
-    return NextResponse.json({
-      status: "error", db: false, env: envCheck,
-      error: e.message,
-      stack: e.stack?.split("\n")?.slice(0, 5),
-      fullMessage: JSON.stringify(e, Object.getOwnPropertyNames(e))
-    }, { status: 500 });
+    return NextResponse.json({ status: "error", db: false, env: envCheck, error: e.message, cause: e.cause?.message }, { status: 500 });
   }
 }
