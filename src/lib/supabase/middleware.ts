@@ -31,6 +31,7 @@ export async function updateSession(request: NextRequest) {
 
   if (
     !user &&
+    !request.cookies.has("guest_mode") &&
     !request.nextUrl.pathname.startsWith("/login") &&
     !request.nextUrl.pathname.startsWith("/auth") &&
     !request.nextUrl.pathname.startsWith("/api")
